@@ -1,52 +1,59 @@
+<div align="center">
+
 # tmux-agent-adon
 
-I built this for my software factory: a fleet of autonomous agents working in
-tmux panels across a phone and a Mac. Every panel is a peer and can change its
-name and responsibility as the work changes. I want to see where agents are
-working, waiting, blocked, or idle at a glance without introducing a central
-controller, database, message broker, or a framework that dictates how they
-work together.
+**A little signal light for every agent workbench.**
 
-The same small indicator is useful outside that fleet: **tmux-agent-adon is a
-general-purpose status signal for any tmux panel**. Use its CLI directly, or
-connect an agent adapter. It is designed to fit into existing themes rather
-than replace a user's tmux setup.
+[English](README.md) · [简体中文](README.zh-CN.md) · [Quick start](#quick-start) · [Agent adapters](#agent-adapters)
 
-Show a name and status for each tmux panel running an agent. Every panel is a
-general-purpose workbench: it can be renamed and take on a different role as
-the work changes.
+![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)
+![tmux](https://img.shields.io/badge/tmux-3.6a%20%7C%203.8-1BB91F.svg)
+![No daemon](https://img.shields.io/badge/runtime-no%20daemon-7c6fdb.svg)
 
-```text
- phone use · Checking the phone                 ● ● ● ● +
- review · Waiting for input                     ● ● ● ● +
-```
+</div>
 
-The rounded indicator has four lights on each panel's top-right border, in
-green, yellow, red, grey order: working, waiting, blocked, idle. The current
-state is bright and the other lights retain their own dim colours. A connected
-agent with unknown state shows four dim coloured lights; without a reporter all
-four lights are uncoloured and dim.
-An ASCII alternative uses
-uppercase to identify the lit state when Unicode or colour is unavailable.
-A lamp is a status report, not proof
-that a task succeeded. It does not route messages or control agents.
+![Illustration of four tmux agent panels with individual status lights](assets/fleet-demo.svg)
 
-Where pane-border mouse controls are supported, click `+` beside a panel's
-lights to rename that panel or set its status. Mouse mode must be enabled.
-Otherwise, the button is hidden and an available `prefix + a` opens the menu
-for the current panel. Existing bindings are never replaced.
+## Why I built this
 
-The standard indicator works with ordinary terminal text. For a soft glow like
-an instrument panel, Ghostty users can opt into the experimental static
-[glow shader](effects/ghostty/README.md). It runs on the viewing client, so it
-also works when viewing a remote tmux session over SSH. Other terminals keep
-the normal indicator. The shader matches pixels by colour, so unrelated text
-using a matching colour may also glow.
+I am building a software factory: a fleet of autonomous agents working across
+a phone and a Mac. Each tmux panel is a peer and can take a different name or
+responsibility as its context changes. I wanted to see which workbenches were
+working, waiting, blocked, or idle at a glance.
 
-## Install
+**tmux-agent-adon is the signal light for that fleet, and a small, general-purpose
+component for any tmux panel.** It keeps state in tmux and lets agents use
+ordinary commands. There is no central controller, database, message broker, or
+required background daemon. Agents remain free to choose how they work together.
 
-Clone the repository, add `bin/` to your `PATH`, and load the tmux plugin.
-For example, with a clone in `~/.local/share/tmux-agent-adon`:
+## The lights
+
+Each panel has the same four lights, displayed at the top right:
+
+| Light | Panel status |
+| :---: | --- |
+| 🟢 | Working |
+| 🟡 | Waiting for input, another agent, or an external condition |
+| 🔴 | Blocked or reporting an error |
+| ⚪ | Idle |
+
+With an agent adapter or a manual status report, the four lights have dim
+colours and the current state is bright. A connected reporter with an unknown
+state leaves all four dimly coloured; a panel with no reporter shows four
+neutral dim lights. The lights report panel status, not task success.
+
+Names are flexible: a panel can be `phone use` for one task and `dev` for the
+next. A mouse `+` menu can rename a panel or set its state when supported. On
+older servers, an available `prefix + a` opens the menu for the current panel.
+Existing bindings are not overwritten.
+
+## Quick start
+
+Requirements: tmux, POSIX `sh`, and common Unix utilities. Tested with tmux
+3.6a and 3.8. Unicode/Powerline glyph support is recommended; an ASCII format
+is available in the [display guide](examples/README.md).
+
+**1. Clone and load the plugin.** Run this inside the tmux server you want to use:
 
 ```sh
 git clone https://github.com/toyauro/tmux-agent-adon.git ~/.local/share/tmux-agent-adon
@@ -54,73 +61,71 @@ export PATH="$HOME/.local/share/tmux-agent-adon/bin:$PATH"
 tmux run-shell "$HOME/.local/share/tmux-agent-adon/agent-adon.tmux"
 ```
 
-Loading the plugin registers reusable format fragments and, if available, a
-mouse binding for the `+` control. It **does not change existing pane
-borders or names**, and it never replaces an existing control binding. Insert
-`#{E:@agent_adon_indicator_format}` into your existing `pane-border-format`, or
-enable the bundled complete label on a chosen window as described in
-[examples/README.md](examples/README.md). Load the plugin again after the tmux
-server restarts. A TPM-compatible entrypoint is included at the repository root.
+Add the `PATH` entry to your shell configuration if you want it in future
+shells. Load the plugin again after restarting the tmux server; the repository
+also includes a TPM-compatible entrypoint.
 
-The shell CLI requires `tmux`, POSIX `sh`, and common Unix utilities. The Pi
-adapter additionally needs Pi and Node.js; the optional hook bridge for Claude
-Code, Codex and Antigravity needs Python 3. tmux 3.8 and 3.6a have been tested;
-3.6a uses the keyboard menu described above.
+**2. Show the lights.** To try the bundled label in the current window:
 
-## Report status
+```sh
+tmux set-option -w pane-border-status top
+tmux set-option -w pane-border-format '#{E:@agent_adon_label_format}'
+```
 
-From a shell inside a tmux panel:
+This changes that window's border format. If you already use a tmux theme,
+keep it and merge `#[align=right]#{E:@agent_adon_indicator_format}` into your
+existing format instead. See the [display guide](examples/README.md) for
+theme integration, mouse controls, and the ASCII alternative.
+
+**3. Set your panel's status.**
 
 ```sh
 lamp set working --name 'phone use' --detail 'Checking the phone'
 lamp set waiting --detail 'Waiting for review'
 lamp set error --detail 'Unable to proceed'
-lamp set idle --name dev
-lamp set unknown --detail 'Agent disconnected'
-lamp connect
-lamp disconnect
-lamp get --field state
+lamp set idle
+lamp disconnect                     # Return to neutral, no-reporter lights
 ```
 
-The current `$TMUX_PANE` is used by default. Specify `--pane %ID` to select a
-particular pane on the current tmux server. The ID is server-local, not a
-cross-device address; query the intended server over SSH. A name is for people
-to read and can be changed or duplicated. When `--detail` is omitted, the old
-detail is cleared. Name and detail are limited to 512 bytes, are single-line,
-and currently reject `#` to prevent tmux format/style injection.
+`lamp` targets the current `$TMUX_PANE`; `--pane %ID` selects a panel on the
+same tmux server. `lamp get --field state` reads the current state. A name can
+be changed or duplicated and is not a network address. `lamp set unknown`
+clears the known state but does not disconnect an existing reporter.
 
-`lamp set --name` updates the conventional `@pane_name` pane option, which can
-also be maintained by an existing tmux configuration. The lamp-specific state,
-detail, and timestamp are stored in pane-local `@agent_adon_*` options.
-`connect` records a reporter and `disconnect` clears it; setting a known state
-also records a report, including a manual report. This is not a process
-liveness check: a crash can leave a stale report.
+## Agent adapters
 
-## Optional agent integration
+Adapters are optional. They translate available agent events into the same
+panel-local state; they do not change how agents plan or use tools.
 
-All adapters are opt-in; they do not install hooks, change user configuration,
-or start background servers. A running agent must load the relevant adapter.
+| Agent | Integration | Validation |
+| --- | --- | --- |
+| **Pi** | `pi -e /path/to/tmux-agent-adon/adapters/pi` | Loaded on an Android phone; idle → working → idle verified with a real task. |
+| **Claude Code, Codex, Antigravity CLI** | [Opt-in hook examples](adapters/hooks/README.md) | Simulated events tested; live event coverage and ordering still need verification. |
+| **Other agents** | Call `lamp` from a shell | No agent-specific integration required. |
 
-- **Pi**: put `lamp` in the Pi process's `PATH` or set `LAMP_BIN` to its
-  absolute path, then start Pi with `-e /path/to/tmux-agent-adon/adapters/pi`.
-  Agent start, blocking UI prompts and final settlement drive the light. An
-  explicitly reported error is kept until the next run. The Pi adapter needs
-  a version that provides the corresponding extension events.
-- **Claude Code, Codex and Antigravity CLI**: see
-  [the opt-in hook examples and limitations](adapters/hooks/README.md).
-  They provide conservative partial integration; live event ordering and
-  version support have not yet been verified for these three agents.
-- Any agent or person can invoke `lamp` directly. Additional adapters only need
-  to translate their own supported events into the same CLI calls.
+For Pi, ensure `lamp` is on its `PATH`, or set `LAMP_BIN` to the executable's
+absolute path before starting Pi. Hook-based adapters also require Python 3 and
+must be configured and trusted according to the agent's own rules.
 
-Hooks cannot observe every kind of wait or business failure. A tool error is
-not automatically a blocked task; ending an agent turn is not proof of success.
-Forced termination may leave the last reported lamp visible. tmux does not
-persist the state after its server exits. There is no heartbeat or automatic
-staleness detection in this version; use the reported timestamp to investigate
-and use `unknown` when the status cannot be confirmed.
+## Optional glow
 
-## Verify
+The standard indicator uses terminal text. Ghostty users can try the optional
+[static glow shader](effects/ghostty/README.md) for a softer instrument-panel
+look. It renders on the viewing client, including when viewing a remote phone
+over SSH. This effect is experimental: similar colours elsewhere in the
+terminal may glow, and it requires validation with your terminal and theme.
+
+## Boundaries
+
+- A state is a report, not a liveness guarantee. A forced exit may leave a
+  stale light; there is no heartbeat or automatic stale-state detection.
+- tmux server restarts clear its pane-local state. A reporter must reconnect.
+- An individual tool failure does not necessarily mean the agent is blocked;
+  turn completion does not prove the underlying task succeeded.
+- This project displays signals. It does not route messages or coordinate
+  agent tasks.
+
+## Development
 
 ```sh
 python3 -m unittest discover -s tests -v
@@ -128,7 +133,5 @@ python3 -m unittest -v adapters.hooks.test_lamp_hook
 node --test adapters/pi/*.test.js
 ```
 
-The integration tests create their own tmux server and clean it up. No existing
-panels or user agent configuration are modified.
-
-MIT licensed; see [LICENSE](LICENSE).
+The tmux tests use isolated servers. Contributions and new agent adapters are
+welcome. Licensed under the [MIT License](LICENSE).
