@@ -18,38 +18,55 @@ bind_menu() {
         'No reported state' u 'set-option -p @agent_adon_connected 0 ; set-option -p @agent_adon_state unknown ; set-option -p @agent_adon_detail "" ; set-option -pu @agent_adon_updated'
 }
 
+mouse_available=0
+keyboard_available=0
+mouse_reason=
 mouse_binding=$("$tmux_bin" list-keys -T root MouseDown1Control1 2>/dev/null || :)
 case "$mouse_binding" in
     *'ADON panel controls'*)
-        bind_menu root MouseDown1Control1 -t = -x M -y M
-        "$tmux_bin" set-option -g @agent_adon_controls_available 1
-        exit 0 ;;
+        if bind_menu root MouseDown1Control1 -t = -x M -y M 2>/dev/null; then
+            mouse_available=1
+        else
+            mouse_reason='could not refresh existing agent-adon mouse binding'
+        fi ;;
     '')
         if bind_menu root MouseDown1Control1 -t = -x M -y M 2>/dev/null; then
-            "$tmux_bin" set-option -g @agent_adon_controls_available 1
-            exit 0
+            mouse_available=1
+        else
+            mouse_reason='server does not support MouseDown1Control1'
         fi
-        reason='server does not support MouseDown1Control1' ;;
-    *) reason='MouseDown1Control1 is already bound' ;;
+        ;;
+    *) mouse_reason='MouseDown1Control1 is already bound' ;;
 esac
+"$tmux_bin" set-option -g @agent_adon_controls_available "$mouse_available"
 
-# Older servers cannot hit-test a control range on a pane border. Give them a
-# keyboard menu for the current pane instead of a misleading fake button.
-"$tmux_bin" set-option -g @agent_adon_controls_available 0
+# Offer the same keyboard entry on every server, including those with a
+# clickable button. Unrelated existing bindings stay intact; our own are
+# refreshed so a menu update takes effect when the plugin is reloaded.
 prefix_binding=$("$tmux_bin" list-keys -T prefix a 2>/dev/null || :)
 case "$prefix_binding" in
     *'ADON panel controls'*)
-        bind_menu prefix a -x P -y P
-        printf 'agent-adon: %s; use prefix + a for the panel menu\n' "$reason" >&2
-        exit 0 ;;
+        if bind_menu prefix a -x P -y P 2>/dev/null; then
+            keyboard_available=1
+        else
+            printf '%s\n' 'agent-adon: could not refresh existing prefix + a' >&2
+        fi ;;
     '')
         if bind_menu prefix a -x P -y P 2>/dev/null; then
-            printf 'agent-adon: %s; use prefix + a for the panel menu\n' "$reason" >&2
-            exit 0
+            keyboard_available=1
+        else
+            printf '%s\n' 'agent-adon: could not install prefix + a' >&2
         fi
-        printf 'agent-adon: %s; could not install prefix + a\n' "$reason" >&2
-        exit 1 ;;
+        ;;
     *)
-        printf 'agent-adon: %s; prefix + a is also already bound, so the menu was not installed\n' "$reason" >&2
-        exit 1 ;;
+        printf '%s\n' 'agent-adon: prefix + a is already bound; existing binding preserved' >&2 ;;
 esac
+"$tmux_bin" set-option -g @agent_adon_keyboard_available "$keyboard_available"
+if [ -n "$mouse_reason" ]; then
+    if [ "$keyboard_available" -eq 1 ]; then
+        printf 'agent-adon: %s; use prefix + a for the panel menu\n' "$mouse_reason" >&2
+    else
+        printf 'agent-adon: %s; mouse control unavailable\n' "$mouse_reason" >&2
+    fi
+fi
+[ "$mouse_available" -eq 1 ] || [ "$keyboard_available" -eq 1 ]

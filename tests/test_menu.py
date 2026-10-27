@@ -89,12 +89,15 @@ class MouseMenuTest(unittest.TestCase):
         self.assertNotIn("range=control|1", self.query("display", "-p", "#{E:@agent_adon_indicator_format}"))
 
     def test_keyboard_fallback_on_old_server_or_mouse_conflict(self):
-        if not self.query("display", "-p", "#{version}").startswith("3.6"):
-            subprocess.run(self.tmux + ["bind-key", "-n", "MouseDown1Control1", "display-message", "existing"], check=True)
         result = subprocess.run([str(ROOT / "agent-adon.tmux")], env=self.env, capture_output=True, text=True, check=True)
-        self.assertIn("prefix + a", result.stderr)
-        self.assertEqual(self.query("show-options", "-g", "-v", "@agent_adon_controls_available"), "0")
-        self.assertNotIn("range=control|1", self.query("display", "-p", "#{E:@agent_adon_indicator_format}"))
+        self.assertEqual(self.query("show-options", "-g", "-v", "@agent_adon_keyboard_available"), "1")
+        if self.query("display", "-p", "#{version}").startswith("3.6"):
+            self.assertIn("prefix + a", result.stderr)
+            self.assertEqual(self.query("show-options", "-g", "-v", "@agent_adon_controls_available"), "0")
+            self.assertNotIn("range=control|1", self.query("display", "-p", "#{E:@agent_adon_indicator_format}"))
+        else:
+            self.assertEqual(self.query("show-options", "-g", "-v", "@agent_adon_controls_available"), "1")
+            self.assertIn("range=control|1", self.query("display", "-p", "#{E:@agent_adon_indicator_format}"))
         subprocess.run(self.tmux + ["select-pane", "-t", self.right], check=True)
         master, slave = pty.openpty()
         self.master = master
@@ -125,9 +128,20 @@ class MouseMenuTest(unittest.TestCase):
         subprocess.run(self.tmux + ["bind-key", "-T", "prefix", "a", "display-message", "existing prefix"], check=True)
         before = self.query("list-keys", "-T", "prefix", "a")
         result = subprocess.run([str(ROOT / "agent-adon.tmux")], env=self.env, capture_output=True, text=True, check=True)
-        self.assertIn("prefix + a is also already bound", result.stderr)
+        self.assertIn("prefix + a is already bound", result.stderr)
         self.assertEqual(before, self.query("list-keys", "-T", "prefix", "a"))
         self.assertEqual(self.query("show-options", "-g", "-v", "@agent_adon_controls_available"), "0")
+
+    def test_prefix_conflict_preserved_while_mouse_still_works(self):
+        if self.query("display", "-p", "#{version}").startswith("3.6"):
+            self.skipTest("tmux 3.6 has no border mouse-control key")
+        subprocess.run(self.tmux + ["bind-key", "-T", "prefix", "a", "display-message", "existing prefix"], check=True)
+        before = self.query("list-keys", "-T", "prefix", "a")
+        result = subprocess.run([str(ROOT / "agent-adon.tmux")], env=self.env, capture_output=True, text=True, check=True)
+        self.assertIn("prefix + a is already bound", result.stderr)
+        self.assertEqual(before, self.query("list-keys", "-T", "prefix", "a"))
+        self.assertEqual(self.query("show-options", "-g", "-v", "@agent_adon_controls_available"), "1")
+        self.assertEqual(self.query("show-options", "-g", "-v", "@agent_adon_keyboard_available"), "0")
 
 
 if __name__ == "__main__":

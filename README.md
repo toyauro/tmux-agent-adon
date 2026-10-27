@@ -43,9 +43,9 @@ state leaves all four dimly coloured; a panel with no reporter shows four
 neutral dim lights. The lights report panel status, not task success.
 
 Names are flexible: a panel can be `phone use` for one task and `dev` for the
-next. A mouse `+` menu can rename a panel or set its state when supported. On
-older servers, an available `prefix + a` opens the menu for the current panel.
-Existing bindings are not overwritten.
+next. An available `prefix + a` opens the menu for the current panel; on
+servers with mouse controls, clicking `+` opens the same menu for that panel.
+Existing unrelated bindings are not overwritten.
 
 ## Quick start
 
@@ -100,7 +100,9 @@ panel-local state; they do not change how agents plan or use tools.
 | Agent | Integration | Validation |
 | --- | --- | --- |
 | **Pi** | `pi -e /path/to/tmux-agent-adon/adapters/pi` | Loaded on an Android phone; idle → working → idle verified with a real task. |
-| **Claude Code, Codex, Antigravity CLI** | [Opt-in hook examples](adapters/hooks/README.md) | Simulated events tested; live event coverage and ordering still need verification. |
+| **Claude Code** | [Opt-in hooks](adapters/hooks/README.md) | A running isolated session reloaded hooks and reported working → idle. |
+| **Codex** | [Hooks and hot-loading](adapters/codex/README.md) | Hook hot-loading tested in an isolated TUI; shared-daemon panel binding is still experimental. |
+| **Antigravity CLI** | [Native status-line adapter](adapters/agy/README.md) | Running panels on macOS reported idle → working → idle without restarting. |
 | **Other agents** | Call `lamp` from a shell | No agent-specific integration required. |
 
 For Pi, ensure `lamp` is on its `PATH`, or set `LAMP_BIN` to the executable's

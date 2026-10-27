@@ -20,7 +20,7 @@ class HookTests(unittest.TestCase):
             fake.write_text(
                 "#!" + sys.executable + "\n"
                 "import json, os, pathlib, sys\n"
-                "pathlib.Path(os.environ['HOOK_TEST_OUTPUT']).write_text(json.dumps(sys.argv[1:]))\n"
+                "with pathlib.Path(os.environ['HOOK_TEST_OUTPUT']).open('a') as f: f.write(json.dumps(sys.argv[1:])+'\\n')\n"
             )
             fake.chmod(0o700)
             env = dict(os.environ, TMUX_PANE=pane, LAMP_BIN=str(fake), HOOK_TEST_OUTPUT=str(output))
@@ -29,7 +29,8 @@ class HookTests(unittest.TestCase):
                 input=json.dumps(payload), text=True, capture_output=True, env=env,
                 timeout=3, check=True,
             )
-            return json.loads(result.stdout), json.loads(output.read_text()) if output.exists() else None
+            self.last_calls = [json.loads(line) for line in output.read_text().splitlines()] if output.exists() else []
+            return json.loads(result.stdout), self.last_calls[-1] if self.last_calls else None
 
     def test_prompt_starts_work_without_echoing_secrets(self):
         result, call = self.run_hook("codex", "UserPromptSubmit", {"prompt": "secret prompt"})
@@ -37,14 +38,26 @@ class HookTests(unittest.TestCase):
         self.assertEqual(call, ["set", "working", "--detail", "Codex processing"])
         self.assertNotIn("secret", repr((result, call)))
 
-    def test_stop_never_claims_success(self):
-        for agent in ("codex", "claude", "agy"):
+    def test_stop_reports_activity_without_controlling_agent(self):
+        for agent in ("codex", "agy"):
             with self.subTest(agent=agent):
                 result, call = self.run_hook(agent, "Stop", {"fullyIdle": True})
-                self.assertEqual(call[1], "unknown")
+                self.assertEqual(call[1], "idle" if agent == "codex" else "unknown")
                 self.assertEqual(result, {"decision": "stop"} if agent == "agy" else {})
 
+    def test_codex_continuation_restores_working(self):
+        _, stopped = self.run_hook("codex", "Stop", {})
+        _, resumed = self.run_hook("codex", "UserPromptSubmit", {})
+        self.assertEqual(stopped[1], "idle")
+        self.assertEqual(resumed[1], "working")
+
     def test_claude_idle_and_failure_are_distinct(self):
+        _, call = self.run_hook("claude", "SessionStart", {})
+        self.assertEqual(self.last_calls, [["connect"], ["set", "idle", "--detail", "Claude ready"]])
+        _, call = self.run_hook("claude", "PreToolUse", {})
+        self.assertEqual(call[1], "working")
+        _, call = self.run_hook("claude", "Stop", {})
+        self.assertEqual(call, ["set", "idle", "--detail", "Claude turn stopped"])
         _, call = self.run_hook("claude", "Notification", {"notification_type": "idle_prompt"})
         self.assertEqual(call[1], "idle")
         _, call = self.run_hook("claude", "StopFailure", {"error": "private detail"})

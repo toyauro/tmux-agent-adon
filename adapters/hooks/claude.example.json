@@ -88,6 +88,28 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$LAMP_HOOK\" claude SessionStart",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$LAMP_HOOK\" claude PreToolUse",
+            "timeout": 2
+          }
+        ]
+      }
     ]
   }
 }

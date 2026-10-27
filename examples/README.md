@@ -8,13 +8,13 @@ run-shell '/absolute/path/to/tmux-agent-adon/plugin/agent-adon.tmux'
 ```
 
 Loading it registers format fragments without changing the current border,
-theme, pane names, or status values. It installs `MouseDown1Control1` only if
-that key is unused (or already has this plugin's menu). When the server lacks
-this feature, or that key is already bound, the plugin leaves the binding
-untouched, hides the non-clickable `+`, and offers `prefix + a` for the current
-panel if that key is free. A warning distinguishes unsupported mouse controls
-from an occupied binding. If `prefix + a` is occupied too, it remains untouched
-and no menu is installed.
+theme, pane names, or status values. When `prefix + a` is free, it opens the
+menu for the current panel on all supported versions. On servers that support
+border mouse controls, `+` also opens the same menu for the clicked panel.
+Both bindings are installed only when free; other existing bindings are
+preserved, and this plugin's own bindings are refreshed on reload.
+If a mouse control cannot be installed, `+` is hidden. Warnings report binding
+conflicts and unsupported mouse controls.
 
 Every panel has four lights in fixed order: green (working), yellow (waiting),
 red (error), and grey (idle). An attached adapter or a manual state report
@@ -28,8 +28,9 @@ menu for the clicked panel. The menu can rename that panel or manually report
 working, waiting, blocked, idle, or no state. Manual status can be superseded
 by later reports from a running agent adapter. If mouse mode is off, use tmux
 `set -g mouse on` to enable it; the plugin never changes that option itself.
-The `prefix + a` fallback works with keyboard focus and controls the currently
-selected panel; the button controls the clicked panel.
+`prefix + a` controls the currently selected panel; the button controls the
+clicked panel. Both are available together when their bindings are free and
+the server supports mouse controls.
 
 For an existing pane-border format, append a right-aligned indicator, merging
 it into your existing format rather than replacing your theme:

@@ -33,7 +33,7 @@
 
 接入 Agent 适配器或手动报告状态后，四盏灯显示各自的暗色，当前状态亮起。已接入但状态未知时，四灯保持暗色；没有状态报告方时，四灯显示中性暗灰。**灯表示工位报告的状态，不代表任务成功。**
 
-工位名称可以随任务改变：一个 panel 现在可以叫 `phone use`，之后也可以叫 `dev`。支持鼠标边框控件时，点击 `+` 可以改名或设置状态；较旧的 tmux server 可在快捷键未被占用时使用 `prefix + a` 操作当前 panel。插件不会覆盖已有绑定。
+工位名称可以随任务改变：一个 panel 现在可以叫 `phone use`，之后也可以叫 `dev`。快捷键未被占用时，两端均可用 `prefix + a` 打开当前 panel 的设置菜单；支持鼠标边框控件的 tmux 还可以点击 `+` 打开同一菜单。插件不会覆盖已有的其他绑定。
 
 ## 快速开始
 
@@ -77,7 +77,9 @@ lamp disconnect                     # 回到无报告方的中性暗灰
 | Agent | 接入方式 | 验证情况 |
 | --- | --- | --- |
 | **Pi** | `pi -e /path/to/tmux-agent-adon/adapters/pi` | 已在 Android 手机加载，并通过真实任务验证空闲 → 工作 → 空闲。 |
-| **Claude Code、Codex、Antigravity CLI** | [可选 hooks 示例](adapters/hooks/README.md) | 已测试模拟事件；真实事件覆盖和顺序仍待验证。 |
+| **Claude Code** | [可选 hooks](adapters/hooks/README.md) | 隔离会话在运行中加载 hooks，真实报告工作 → 空闲。 |
+| **Codex** | [Hooks 与热加载](adapters/codex/README.md) | 隔离 TUI 已验证 hooks 热加载；共享后台进程到 panel 的绑定仍为实验性功能。 |
+| **Antigravity CLI** | [原生状态栏适配器](adapters/agy/README.md) | Mac 上已有 panel 无需重启，实际报告空闲 → 工作 → 空闲。 |
 | **其他 Agent** | 在 shell 中调用 `lamp` | 无须专用适配器。 |
 
 使用 Pi 前，请确保其 `PATH` 包含 `lamp`，或在启动前把 `LAMP_BIN` 设置为可执行文件的绝对路径。Hooks 适配器还需要 Python 3，并须按各 Agent 自身的规则配置和信任。
