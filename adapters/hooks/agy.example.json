@@ -1,0 +1,42 @@
+{
+  "tmux-agent-adon": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python3 \"$LAMP_HOOK\" agy PreInvocation",
+        "timeout": 2
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ask_question|ask_permission",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$LAMP_HOOK\" agy PreToolUse",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "ask_question|ask_permission",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$LAMP_HOOK\" agy PostToolUse",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 \"$LAMP_HOOK\" agy Stop",
+        "timeout": 2
+      }
+    ]
+  }
+}

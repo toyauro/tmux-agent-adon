@@ -1,0 +1,95 @@
+#!/bin/sh
+# Pane-local status reporting. Works with the tmux server selected by $TMUX.
+set -eu
+
+usage() {
+    cat <<'EOF'
+Usage:
+  lamp set STATE [--name NAME] [--detail TEXT] [--pane %ID]
+  lamp connect|disconnect [--pane %ID]
+  lamp get [--field state|connected|name|detail|updated] [--pane %ID]
+
+STATE: working, waiting, idle, error, unknown
+Defaults to the current pane ($TMUX_PANE); --pane selects another pane.
+EOF
+}
+
+fail() { printf 'lamp: %s\n' "$*" >&2; exit 2; }
+command -v tmux >/dev/null 2>&1 || fail 'tmux not found in PATH'
+command=${1:-}
+case "$command" in -h|--help|help) usage; exit 0 ;; set|get|connect|disconnect) shift ;; *) usage >&2; exit 2 ;; esac
+
+state= name= detail= field=state
+name_set=0 detail_set=0
+pane=${TMUX_PANE:-}
+if [ "$command" = set ]; then
+    [ "$#" -gt 0 ] || fail 'missing state'
+    state=$1; shift
+    case "$state" in working|waiting|idle|error|unknown) ;; *) fail 'invalid state' ;; esac
+fi
+while [ "$#" -gt 0 ]; do
+    opt=$1; shift
+    [ "$#" -gt 0 ] || fail "missing value for $opt"
+    case "$opt" in
+        --pane) pane=$1 ;;
+        --name) [ "$command" = set ] || fail 'name is only valid with set'; name=$1; name_set=1 ;;
+        --detail) [ "$command" = set ] || fail 'detail is only valid with set'; detail=$1; detail_set=1 ;;
+        --field) [ "$command" = get ] || fail 'field is only valid with get'; field=$1 ;;
+        *) fail "unknown option: $opt" ;;
+    esac
+    shift
+done
+case "$pane" in %*) digits=${pane#%}; case "$digits" in ''|*[!0-9]*) fail 'pane must be a tmux pane ID such as %3' ;; esac ;; *) fail 'set TMUX_PANE or provide --pane %ID' ;; esac
+
+pane_exists() {
+    # display-message may silently fall back to the current pane for a stale ID.
+    tmux list-panes -a -F '#{pane_id}' | grep -F -x -- "$pane" >/dev/null
+}
+
+if [ "$command" = get ]; then
+    case "$field" in
+        state) key=@agent_adon_state ;;
+        connected) key=@agent_adon_connected ;;
+        name) key=@pane_name ;;
+        detail) key=@agent_adon_detail ;;
+        updated) key=@agent_adon_updated ;;
+        *) fail 'invalid field' ;;
+    esac
+    # Ensure a missing target is an error, not an unknown state.
+    pane_exists || fail 'pane not found on the selected tmux server'
+    value=$(tmux show-options -p -v -t "$pane" "$key" 2>/dev/null || :)
+    if [ "$field" = state ] && [ -z "$value" ]; then value=unknown; fi
+    printf '%s\n' "$value"
+    exit 0
+fi
+
+if [ "$command" = connect ] || [ "$command" = disconnect ]; then
+    pane_exists || fail 'pane not found on the selected tmux server'
+    if [ "$command" = connect ]; then
+        tmux set-option -p -t "$pane" @agent_adon_connected 1
+    else
+        tmux set-option -p -t "$pane" @agent_adon_connected 0
+        tmux set-option -p -t "$pane" @agent_adon_state unknown
+    fi
+    exit 0
+fi
+
+# Keep border text one line and bound its size. Values are passed as argv,
+# never evaluated by a shell. The display format must not recursively expand it.
+validate_text() {
+    clean=$(printf '%s' "$1" | LC_ALL=C tr -d '[:cntrl:]')
+    [ "$clean" = "$1" ] || fail 'name and detail cannot contain control characters'
+    case "$1" in *'#'*) fail 'name and detail cannot contain tmux format characters (#)' ;; esac
+    count=$(printf '%s' "$1" | LC_ALL=C wc -c | tr -d ' ')
+    [ "$count" -le 512 ] || fail 'name or detail is longer than 512 bytes'
+}
+if [ "$name_set" -eq 1 ]; then validate_text "$name"; fi
+if [ "$detail_set" -eq 1 ]; then validate_text "$detail"; fi
+pane_exists || fail 'pane not found on the selected tmux server'
+if [ "$name_set" -eq 1 ]; then tmux set-option -p -t "$pane" @pane_name "$name"; fi
+# Reset an old reason when the caller changes state without a new detail.
+tmux set-option -p -t "$pane" @agent_adon_detail "$detail"
+tmux set-option -p -t "$pane" @agent_adon_updated "$(date +%s)"
+tmux set-option -p -t "$pane" @agent_adon_state "$state"
+# An explicit valid status is also a report from a user or adapter.
+if [ "$state" != unknown ]; then tmux set-option -p -t "$pane" @agent_adon_connected 1; fi
